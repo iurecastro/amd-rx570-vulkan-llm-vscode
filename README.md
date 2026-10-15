@@ -45,7 +45,7 @@ This guide shows how to bypass that limitation using the **Vulkan backend** with
 - **No ROCm required** — works on older AMD cards.
 - **Cross-platform** — Vulkan runs on Windows and Linux.
 - **Full VRAM offload** — keeps the model on the GPU for fast inference.
-- **OpenAI-compatible API** — `llama` exposes `/v1/chat/completions`.
+- **OpenAI-compatible API** — `llama-server` exposes `/v1/chat/completions`.
 
 ---
 
@@ -56,7 +56,7 @@ This guide shows how to bypass that limitation using the **Vulkan backend** with
 | OS | Windows 10 / 11 |
 | GPU | AMD Radeon RX 570 (8GB VRAM) |
 | Runtime | Vulkan SDK (LunarG) |
-| Inference Engine | `llama.cpp` (`llama.exe`) |
+| Inference Engine | `llama.cpp` (`llama-server.exe`) |
 | Model | `qwen2.5-coder-7b-instruct` (GGUF) |
 | Editor | Visual Studio Code (Native Chat) |
 
@@ -86,12 +86,12 @@ The Vulkan SDK provides the runtime and drivers needed for GPU compute shaders.
    The file will be named something like:  
    `llama-bXXXX-bin-win-vulkan-x64.zip`
 3. Download and extract the ZIP into `C:\llama`.  
-   You should see `llama.exe` and its dependencies (DLLs) inside.
+   You should see `llama-server.exe` and its dependencies (DLLs) inside.
 
 4. Test device discovery:
    ```powershell
    cd C:\llama
-   .\llama.exe --list-devices
+   .\llama-server.exe --list-devices
    ```
 
    Expected output:
@@ -126,7 +126,7 @@ Create the following layout inside `C:\llama`:
 
 ```
 C:\llama\
-├── llama.exe
+├── llama-server.exe
 ├── llama.dll
 ├── ggml-vulkan.dll
 ├── ... (other llama.cpp DLLs)
@@ -134,8 +134,7 @@ C:\llama\
 │   └── qwen2.5-coder-7b\
 │       └── qwen2.5-coder-7b.gguf
 ├── logs\
-├── start-llama.bat
-└── stop-llama.bat
+└── start-llama.bat
 ```
 
 Move the downloaded `.gguf` file into:  
@@ -151,7 +150,7 @@ You can start the server manually or via a batch script.
 
 ```powershell
 cd C:\llama
-.\llama.exe -m "C:\llama\models\qwen2.5-coder-7b\qwen2.5-coder-7b.gguf" -ngl 99 -c 32768 --port 1234
+.\llama-server.exe -m "C:\llama\models\qwen2.5-coder-7b\qwen2.5-coder-7b.gguf" -ngl 99 -c 32768 --port 1234
 ```
 
 - `-ngl 99` → offloads all layers to VRAM.
@@ -163,9 +162,13 @@ cd C:\llama
 Create this file inside `C:\llama`:
 
 ```bat
+@echo off
 cd /d C:\llama
-llama.exe -m "C:\llama\models\qwen\qwen2.5-coder-7b\qwen2.5-coder-7b.gguf" -ngl 99 --port 1234
+llama-server.exe -m "C:\llama\models\qwen2.5-coder-7b\qwen2.5-coder-7b.gguf" -ngl 99 -c 32768 --port 1234
+pause
 ```
+
+Double-click it whenever you want to start the server.
 
 ---
 
@@ -201,7 +204,7 @@ VS Code supports local custom endpoints natively via `chatLanguageModels.json`.
 5. Select **Qwen 2.5 Coder 7B** from the model selector.
 6. Start chatting and coding locally!
 
-> **Note:** The `id` must match exactly what `llama` reports. If you used a different filename, update the `id` accordingly.
+> **Note:** The `id` must match exactly what `llama-server` reports. If you used a different filename, update the `id` accordingly.
 
 ---
 
@@ -222,9 +225,9 @@ VS Code supports local custom endpoints natively via `chatLanguageModels.json`.
 
 | Problem | Possible Solution |
 |---------|-------------------|
-| `Language model unavailable` | Make sure `llama.exe` is running on port `1234`. Restart VS Code. |
-| `The selected model ... is not available` | Check if the `id` in `chatLanguageModels.json` matches the model name served by `llama`. |
-| Server not responding | Run `.\llama.exe --list-devices` and confirm `Vulkan0` is detected. |
+| `Language model unavailable` | Make sure `llama-server.exe` is running on port `1234`. Restart VS Code. |
+| `The selected model ... is not available` | Check if the `id` in `chatLanguageModels.json` matches the model name served by `llama-server`. |
+| Server not responding | Run `.\llama-server.exe --list-devices` and confirm `Vulkan0` is detected. |
 | Slow generation | Close other GPU-heavy apps. Reduce context size. Ensure `-ngl 99` is used. |
 | VS Code doesn't show the model | Verify the JSON syntax. Restart VS Code after saving. |
 | `Vulkan0` not detected | Update your GPU drivers. Make sure the Vulkan SDK is installed. |
@@ -237,10 +240,7 @@ VS Code supports local custom endpoints natively via `chatLanguageModels.json`.
 .
 ├── README.md
 ├── LICENSE
-├── start-llama.bat
-└── images/
-    ├── task-manager.png
-    └── vscode-chat.png
+└── start-llama.bat
 ```
 
 ---
