@@ -238,7 +238,6 @@ VS Code supports local custom endpoints natively via `chatLanguageModels.json`.
 ├── README.md
 ├── LICENSE
 ├── start-llama.bat
-├── stop-llama.bat
 └── images/
     ├── task-manager.png
     └── vscode-chat.png
