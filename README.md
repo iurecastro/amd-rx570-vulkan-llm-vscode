@@ -15,9 +15,11 @@
 - [Why Vulkan?](#why-vulkan)
 - [Prerequisites](#prerequisites)
 - [Step 1: Install Vulkan SDK](#step-1-install-vulkan-sdk)
-- [Step 2: Set up llama.cpp](#step-2-set-up-llamacpp)
-- [Step 3: Run the server with GPU offload](#step-3-run-the-server-with-gpu-offload)
-- [Step 4: Integrate with VS Code](#step-4-integrate-with-vs-code)
+- [Step 2: Download llama.cpp (Vulkan build)](#step-2-download-llamacpp-vulkan-build)
+- [Step 3: Download the Qwen2.5 Coder 7B model](#step-3-download-the-qwen25-coder-7b-model)
+- [Step 4: Organize your folder structure](#step-4-organize-your-folder-structure)
+- [Step 5: Run the server with GPU offload](#step-5-run-the-server-with-gpu-offload)
+- [Step 6: Integrate with VS Code](#step-6-integrate-with-vs-code)
 - [Performance](#performance)
 - [Troubleshooting](#troubleshooting)
 - [Repository Structure](#repository-structure)
@@ -62,25 +64,34 @@ This guide shows how to bypass that limitation using the **Vulkan backend** with
 
 ## Step 1: Install Vulkan SDK
 
-1. Download the latest **Vulkan SDK** from [LunarG](https://vulkan.lunarg.com/).
-2. Install with default components.
-3. Verify your GPU is detected using **Vulkan Hardware Capability Viewer** or the CLI.
+The Vulkan SDK provides the runtime and drivers needed for GPU compute shaders.
+
+1. Go to the official LunarG download page:  
+   **[https://vulkan.lunarg.com/sdk/home#windows](https://vulkan.lunarg.com/sdk/home#windows)**
+2. Download the **Windows x64** installer (e.g., `vulkansdk-windows-X64-1.4.363.0.exe`, ~289 MB).
+3. Run the installer and keep the default components.
+4. After installation, verify your GPU is detected by running the **Vulkan Hardware Capability Viewer** or using the CLI.
+
+> **Note:** The Vulkan SDK is only required at runtime for `llama.cpp` to access the GPU. You do not need to compile anything.
 
 ---
 
-## Step 2: Set up `llama.cpp`
+## Step 2: Download llama.cpp (Vulkan build)
 
-1. Create a folder, for example:
-   ```powershell
-   C:\llama
-   ```
+`llama.cpp` provides precompiled Windows binaries with Vulkan support.
 
-2. Download the precompiled Windows binaries for `llama.cpp` with **Vulkan support**.
-3. Place `llama-server.exe` inside `C:\llama`.
+1. Go to the official releases page:  
+   **[https://github.com/ggml-org/llama.cpp/releases](https://github.com/ggml-org/llama.cpp/releases)**
+2. Find the latest release that includes a **Windows x64 (Vulkan)** asset.  
+   The file will be named something like:  
+   `llama-bXXXX-bin-win-vulkan-x64.zip`
+3. Download and extract the ZIP into `C:\llama`.  
+   You should see `llama.exe` and its dependencies (DLLs) inside.
+
 4. Test device discovery:
    ```powershell
    cd C:\llama
-   .\llama-server.exe --list-devices
+   .\llama.exe --list-devices
    ```
 
    Expected output:
@@ -89,43 +100,145 @@ This guide shows how to bypass that limitation using the **Vulkan backend** with
      Vulkan0: Radeon RX 570 Series (8192 MiB, ...)
    ```
 
+> **Tip:** If you don't see `Vulkan0`, make sure the Vulkan SDK is installed and your GPU drivers are up to date.
+
 ---
 
-## Step 3: Run the server with GPU offload
+## Step 3: Download the Qwen2.5 Coder 7B model
 
-Start the server manually:
+The model must be in **GGUF** format.
+
+1. Go to the Hugging Face model page:  
+   **[https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF](https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF)**
+2. Choose a quantization that fits your VRAM. For an RX 570 8GB, **Q4_K_M** is a good balance.  
+   Example file: `qwen2.5-coder-7b-instruct-q4_k_m.gguf` (~4.7 GB)
+3. Download the `.gguf` file.
+
+> **Alternative:** You can also use community GGUF repos like  
+> [bartowski/Qwen2.5-Coder-7B-Instruct-GGUF](https://huggingface.co/bartowski/Qwen2.5-Coder-7B-Instruct-GGUF) or  
+> [DhruvalLabs/Qwen2.5-Coder-7B-Instruct-GGUF](https://huggingface.co/DhruvalLabs/Qwen2.5-Coder-7B-Instruct-GGUF).
+
+---
+
+## Step 4: Organize your folder structure
+
+Create the following layout inside `C:\llama`:
+
+```
+C:\llama\
+├── llama-server.exe
+├── llama.dll
+├── ggml-vulkan.dll
+├── ... (other llama.cpp DLLs)
+├── models\
+│   └── qwen2.5-coder-7b\
+│       └── qwen2.5-coder-7b.gguf
+├── logs\
+├── start-llama.bat
+└── stop-llama.bat
+```
+
+Move the downloaded `.gguf` file into:  
+`C:\llama\models\qwen2.5-coder-7b\qwen2.5-coder-7b.gguf`
+
+---
+
+## Step 5: Run the server with GPU offload
+
+You can start the server manually or via a batch script.
+
+### Manual start
 
 ```powershell
 cd C:\llama
-.\llama-server.exe -m "C:\path\to\models\qwen2.5-coder-7b.gguf" -ngl 99 --port 1234
+.\llama.exe -m "C:\llama\models\qwen2.5-coder-7b\qwen2.5-coder-7b.gguf" -ngl 99 -c 32768 --port 1234
 ```
 
 - `-ngl 99` → offloads all layers to VRAM.
+- `-c 32768` → context size.
 - `--port 1234` → sets the local OpenAI-compatible endpoint.
 
-### Optional: one-click startup script
+### Batch script: `start-llama.bat`
 
-Create `start-llama.bat` inside `C:\llama`:
+Create this file inside `C:\llama`:
 
-```cmd
+```bat
 @echo off
-cd /d C:\llama
-llama-server.exe -m "C:\path\to\models\qwen2.5-coder-7b.gguf" -ngl 99 --port 1234
+setlocal
+title llama-server - Qwen 2.5 Coder 7B (Vulkan)
+
+set LLAMA_DIR=C:\llama
+set MODEL=%LLAMA_DIR%\models\qwen2.5-coder-7b\qwen2.5-coder-7b.gguf
+set PORT=1234
+set NGL=99
+set CTX=32768
+set LOG_DIR=%LLAMA_DIR%\logs
+
+cd /d "%LLAMA_DIR%" || (echo [ERRO] Pasta %LLAMA_DIR% nao encontrada. & pause & exit /b 1)
+
+if not exist "llama-server.exe" (
+    echo [ERRO] llama-server.exe nao encontrado.
+    pause
+    exit /b 1
+)
+
+if not exist "%MODEL%" (
+    echo [ERRO] Modelo nao encontrado: %MODEL%
+    pause
+    exit /b 1
+)
+
+if not exist "%LOG_DIR%" mkdir "%LOG_DIR%"
+
+for /f "tokens=2 delims==" %%I in ('wmic os get localdatetime /value') do set DT=%%I
+set LOG=%LOG_DIR%\server_%DT:~0,8%_%DT:~8,6%.log
+
+echo ============================================
+echo  Iniciando llama-server (Vulkan)
+echo  Modelo : %MODEL%
+echo  Porta  : %PORT%
+echo  GPU    : -ngl %NGL%
+echo  Contexto: %CTX%
+echo  Log    : %LOG%
+echo ============================================
+echo.
+
+llama-server.exe ^
+    -m "%MODEL%" ^
+    -ngl %NGL% ^
+    -c %CTX% ^
+    --port %PORT% ^
+    --host 127.0.0.1 ^
+    2>&1 | powershell -NoProfile -Command "$input | Tee-Object -FilePath '%LOG%'"
+
+echo.
+echo [INFO] Servidor encerrado.
+pause
+endlocal
+```
+
+### Stop script: `stop-llama.bat`
+
+```bat
+@echo off
+echo Encerrando llama-server...
+taskkill /F /IM llama-server.exe 2>nul
+if %errorlevel%==0 (
+    echo Servidor encerrado com sucesso.
+) else (
+    echo Nenhum llama.exe em execucao.
+)
 pause
 ```
 
-Double-click it whenever you want to start the server.
-
 ---
 
-## Step 4: Integrate with VS Code
+## Step 6: Integrate with VS Code
 
-VS Code supports local custom endpoints natively.
+VS Code supports local custom endpoints natively via `chatLanguageModels.json`.
 
-1. Open the language model configuration file:
-   ```
-   %APPDATA%\Code\User\chatLanguageModels.json
-   ```
+1. Open the language model configuration file:  
+   `%APPDATA%\Code\User\chatLanguageModels.json`
 
 2. Add or replace with:
 
@@ -152,6 +265,8 @@ VS Code supports local custom endpoints natively.
 5. Select **Qwen 2.5 Coder 7B** from the model selector.
 6. Start chatting and coding locally!
 
+> **Note:** The `id` must match exactly what `llama-server` reports. If you used a different filename, update the `id` accordingly.
+
 ---
 
 ## Performance
@@ -173,9 +288,10 @@ VS Code supports local custom endpoints natively.
 |---------|-------------------|
 | `Language model unavailable` | Make sure `llama-server.exe` is running on port `1234`. Restart VS Code. |
 | `The selected model ... is not available` | Check if the `id` in `chatLanguageModels.json` matches the model name served by `llama-server`. |
-| Server not responding | Run `.\llama-server.exe --list-devices` and confirm Vulkan0 is detected. |
+| Server not responding | Run `.\llama-server.exe --list-devices` and confirm `Vulkan0` is detected. |
 | Slow generation | Close other GPU-heavy apps. Reduce context size. Ensure `-ngl 99` is used. |
 | VS Code doesn't show the model | Verify the JSON syntax. Restart VS Code after saving. |
+| `Vulkan0` not detected | Update your GPU drivers. Make sure the Vulkan SDK is installed. |
 
 ---
 
@@ -186,6 +302,7 @@ VS Code supports local custom endpoints natively.
 ├── README.md
 ├── LICENSE
 ├── start-llama.bat
+├── stop-llama.bat
 └── images/
     ├── task-manager.png
     └── vscode-chat.png
