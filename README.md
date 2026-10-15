@@ -163,72 +163,8 @@ cd C:\llama
 Create this file inside `C:\llama`:
 
 ```bat
-@echo off
-setlocal
-title llama-server - Qwen 2.5 Coder 7B (Vulkan)
-
-set LLAMA_DIR=C:\llama
-set MODEL=%LLAMA_DIR%\models\qwen2.5-coder-7b\qwen2.5-coder-7b.gguf
-set PORT=1234
-set NGL=99
-set CTX=32768
-set LOG_DIR=%LLAMA_DIR%\logs
-
-cd /d "%LLAMA_DIR%" || (echo [ERRO] Pasta %LLAMA_DIR% nao encontrada. & pause & exit /b 1)
-
-if not exist "llama-server.exe" (
-    echo [ERRO] llama-server.exe nao encontrado.
-    pause
-    exit /b 1
-)
-
-if not exist "%MODEL%" (
-    echo [ERRO] Modelo nao encontrado: %MODEL%
-    pause
-    exit /b 1
-)
-
-if not exist "%LOG_DIR%" mkdir "%LOG_DIR%"
-
-for /f "tokens=2 delims==" %%I in ('wmic os get localdatetime /value') do set DT=%%I
-set LOG=%LOG_DIR%\server_%DT:~0,8%_%DT:~8,6%.log
-
-echo ============================================
-echo  Iniciando llama-server (Vulkan)
-echo  Modelo : %MODEL%
-echo  Porta  : %PORT%
-echo  GPU    : -ngl %NGL%
-echo  Contexto: %CTX%
-echo  Log    : %LOG%
-echo ============================================
-echo.
-
-llama-server.exe ^
-    -m "%MODEL%" ^
-    -ngl %NGL% ^
-    -c %CTX% ^
-    --port %PORT% ^
-    --host 127.0.0.1 ^
-    2>&1 | powershell -NoProfile -Command "$input | Tee-Object -FilePath '%LOG%'"
-
-echo.
-echo [INFO] Servidor encerrado.
-pause
-endlocal
-```
-
-### Stop script: `stop-llama.bat`
-
-```bat
-@echo off
-echo Encerrando llama-server...
-taskkill /F /IM llama-server.exe 2>nul
-if %errorlevel%==0 (
-    echo Servidor encerrado com sucesso.
-) else (
-    echo Nenhum llama.exe em execucao.
-)
-pause
+cd /d C:\llama
+llama-server.exe -m "C:\llama\models\qwen\qwen2.5-coder-7b\qwen2.5-coder-7b.gguf" -ngl 99 --port 1234
 ```
 
 ---
